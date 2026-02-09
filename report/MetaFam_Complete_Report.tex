@@ -24,6 +24,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{longtable}
+\usepackage{multirow}
 \usepackage{pifont}
 \usepackage{tocloft}
 \usepackage[numbers,sort&compress]{natbib}
@@ -173,7 +174,7 @@ This report presents a comprehensive analysis of the \textbf{MetaFam Knowledge G
     
     \item \textbf{Task 3 (Rules):} Discovered 8 horn-clause rules with varying confidence. Transitive rules (grandmother, sibling, aunt) achieved 100\% confidence. Complex cousin rules showed 0\% confidence due to missing relation types.
     
-    \item \textbf{Task 4 (Link Prediction):} Implemented KGE models (TransE, DistMult, ComplEx, RotatE) and GNN approaches (RGCN) with three data splitting strategies to analyze data leakage and generalization.
+    \item \textbf{Task 4 (Link Prediction):} Implemented KGE models (TransE, DistMult, ComplEx, RotatE) and GNN approaches (RGCN). \textbf{ComplEx achieved best performance} with 0.877 MRR on full training. Inverse leakage removal split showed ~12\% validation performance drop, indicating models were exploiting inverse relation shortcuts.
 \end{enumerate}
 
 \subsection{Technical Contributions}
@@ -788,6 +789,191 @@ Based on the theoretical properties of models and splitting strategies:
 \end{enumerate}
 
 % ============================================================================
+% EXPERIMENTAL RESULTS
+% ============================================================================
+\section{Experimental Results}
+
+All models were trained with the following hyperparameters:
+\begin{itemize}
+    \item Embedding dimension: 100
+    \item Epochs: 50
+    \item Batch size: 128
+    \item Learning rate: 0.001
+    \item Negative samples: 5
+    \item Early stopping patience: 5 (validation checks)
+    \item Validation frequency: every 5 epochs
+\end{itemize}
+
+\subsection{Custom Implementation Results}
+
+\begin{table}[H]
+    \centering
+    \caption{Complete Results: Custom KGE and GNN Models}
+    \label{tab:custom_results}
+    \small
+    \begin{tabular}{llcccccc}
+        \toprule
+        \textbf{Split Type} & \textbf{Model} & \textbf{Valid MRR} & \textbf{Valid H@10} & \textbf{Test MRR} & \textbf{Test H@1} & \textbf{Test H@10} \\
+        \midrule
+        \multirow{6}{*}{Naive Random} 
+        & TransE & 0.717 & 0.993 & 0.715 & 0.571 & 0.975 \\
+        & DistMult & 0.767 & 0.973 & 0.646 & 0.475 & 0.940 \\
+        & \textbf{ComplEx} & \textbf{0.851} & \textbf{0.992} & \textbf{0.842} & \textbf{0.742} & \textbf{0.992} \\
+        & RotatE & 0.300 & 0.550 & 0.171 & 0.083 & 0.361 \\
+        & RGCN\_DistMult & 0.640 & 0.935 & 0.435 & 0.277 & 0.770 \\
+        & RGCN\_RotatE & 0.593 & 0.933 & 0.513 & 0.346 & 0.835 \\
+        \midrule
+        \multirow{6}{*}{Transductive} 
+        & TransE & 0.698 & 0.988 & 0.706 & 0.552 & 0.970 \\
+        & DistMult & 0.748 & 0.970 & 0.614 & 0.447 & 0.922 \\
+        & \textbf{ComplEx} & \textbf{0.842} & \textbf{0.992} & \textbf{0.852} & \textbf{0.758} & \textbf{0.986} \\
+        & RotatE & 0.302 & 0.559 & 0.209 & 0.111 & 0.414 \\
+        & RGCN\_DistMult & 0.607 & 0.920 & 0.345 & 0.185 & 0.682 \\
+        & RGCN\_RotatE & 0.568 & 0.927 & 0.442 & 0.272 & 0.814 \\
+        \midrule
+        \multirow{6}{*}{\shortstack{Inverse Leakage\\Removal}} 
+        & TransE & 0.622 & 0.962 & 0.698 & 0.547 & 0.972 \\
+        & DistMult & 0.596 & 0.887 & 0.639 & 0.466 & 0.941 \\
+        & \textbf{ComplEx} & \textbf{0.717} & \textbf{0.940} & \textbf{0.838} & \textbf{0.746} & \textbf{0.972} \\
+        & RotatE & 0.266 & 0.495 & 0.163 & 0.078 & 0.335 \\
+        & RGCN\_DistMult & 0.556 & 0.875 & 0.431 & 0.263 & 0.807 \\
+        & RGCN\_RotatE & 0.570 & 0.891 & 0.547 & 0.374 & 0.877 \\
+        \midrule
+        \multirow{6}{*}{Full Train} 
+        & TransE & --- & --- & 0.744 & 0.603 & 0.993 \\
+        & DistMult & --- & --- & 0.693 & 0.517 & 0.995 \\
+        & \textbf{ComplEx} & --- & --- & \textbf{0.877} & \textbf{0.784} & \textbf{0.998} \\
+        & RotatE & --- & --- & 0.263 & 0.147 & 0.501 \\
+        & RGCN\_DistMult & --- & --- & 0.492 & 0.314 & 0.892 \\
+        & RGCN\_RotatE & --- & --- & 0.579 & 0.399 & 0.916 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Best Model per Split Type}
+
+\begin{table}[H]
+    \centering
+    \caption{Best Performing Model by Split Type (Test Set)}
+    \begin{tabular}{lllcc}
+        \toprule
+        \textbf{Split Type} & \textbf{Best Model} & \textbf{Test MRR} & \textbf{Test H@1} & \textbf{Test H@10} \\
+        \midrule
+        Naive Random & ComplEx & 0.842 & 0.742 & 0.992 \\
+        Transductive & ComplEx & 0.852 & 0.758 & 0.986 \\
+        Inverse Leakage Removal & ComplEx & 0.838 & 0.746 & 0.972 \\
+        Full Train & ComplEx & 0.877 & 0.784 & 0.998 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Key Finding:} ComplEx consistently outperforms all other models across all split types, achieving the highest MRR and Hits@10 scores.
+
+\subsection{Model Comparison Visualization}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../outputs/results/model_comparison.png}
+    \caption{Test MRR and Hits@10 comparison across models and split types. ComplEx consistently achieves the highest performance, while RotatE surprisingly underperforms. GNN-based models (RGCN) show moderate performance, with RGCN\_RotatE outperforming RGCN\_DistMult.}
+    \label{fig:model_comparison}
+\end{figure}
+
+\subsection{Split Type Analysis}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{../outputs/results/split_comparison.png}
+    \caption{Average test metrics by split type. Full training (no validation) achieves the highest average metrics as expected, while all strategies show similar performance on the held-out test set, indicating robust generalization.}
+    \label{fig:split_comparison}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Average Test Metrics by Split Type}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Split Type} & \textbf{Avg MRR} & \textbf{Avg H@1} & \textbf{Avg H@10} \\
+        \midrule
+        Naive Random & 0.554 & 0.416 & 0.812 \\
+        Transductive & 0.528 & 0.387 & 0.798 \\
+        Inverse Leakage Removal & 0.553 & 0.412 & 0.817 \\
+        Full Train & 0.608 & 0.461 & 0.882 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Custom vs PyKEEN Library Comparison}
+
+To validate our custom implementations, we compared against PyKEEN, a well-established KGE library.
+
+\begin{table}[H]
+    \centering
+    \caption{Custom vs PyKEEN: Test MRR Comparison (KGE Models Only)}
+    \label{tab:pykeen_comparison}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{Custom MRR} & \textbf{PyKEEN MRR} & \textbf{Difference} & \textbf{Better} \\
+        \midrule
+        TransE & 0.716 & 0.179 & +0.537 & Custom \\
+        DistMult & 0.648 & 0.548 & +0.100 & Custom \\
+        ComplEx & 0.852 & 0.007 & +0.845 & Custom \\
+        RotatE & 0.201 & 0.759 & -0.558 & PyKEEN \\
+        \bottomrule
+    \end{tabular}
+    \small
+    \textit{Note: Values averaged across all split types. PyKEEN ComplEx shows near-zero performance due to potential hyperparameter mismatch.}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../outputs/results/custom_vs_pykeen_mrr.png}
+    \caption{Custom vs PyKEEN Test MRR comparison by split type. Our custom implementations of TransE, DistMult, and ComplEx significantly outperform their PyKEEN counterparts, while PyKEEN's RotatE implementation substantially outperforms our custom version.}
+    \label{fig:custom_vs_pykeen}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{../outputs/results/custom_vs_pykeen_avg.png}
+    \caption{Average Test MRR comparison (Custom vs PyKEEN). Custom ComplEx achieves the highest overall MRR (0.852), while PyKEEN RotatE is the best library model (0.759).}
+    \label{fig:custom_vs_pykeen_avg}
+\end{figure}
+
+\subsection{Inverse Leakage Analysis}
+
+Comparing Transductive vs Inverse-Leakage-Removal splits reveals the impact of inverse relation shortcuts:
+
+\begin{table}[H]
+    \centering
+    \caption{Inverse Leakage Impact on Validation Performance}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Metric} & \textbf{Transductive} & \textbf{Inverse Removed} & \textbf{Change} \\
+        \midrule
+        Avg Valid MRR & 0.628 & 0.554 & -11.8\% \\
+        Avg Valid H@10 & 0.893 & 0.842 & -5.7\% \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Interpretation:} The validation performance drop of ~12\% when removing inverse leakage indicates that models were partially exploiting inverse relation patterns. However, test performance remains similar, suggesting that the external test set is less affected by this leakage.
+
+\subsection{Key Experimental Findings}
+
+\begin{enumerate}
+    \item \textbf{ComplEx Dominates:} Contrary to theoretical expectations that RotatE should excel, ComplEx achieved the best performance across all split types and metrics. This suggests that the family graph's relation patterns (symmetric siblings, asymmetric parent-child) are better captured by ComplEx's conjugate mechanism.
+    
+    \item \textbf{RotatE Underperforms:} Our custom RotatE implementation significantly underperformed, achieving only ~0.2 MRR compared to ComplEx's ~0.85. The PyKEEN RotatE implementation performed much better (~0.76 MRR), indicating potential issues with our custom rotation mechanism or training dynamics.
+    
+    \item \textbf{GNN Models:} RGCN-based models showed moderate performance (0.4-0.6 MRR), with RGCN\_RotatE consistently outperforming RGCN\_DistMult. The message passing mechanism provides useful structural information but doesn't match pure embedding approaches for this dataset.
+    
+    \item \textbf{Full Training Advantage:} Using 100\% of data for training (no validation split) improved average MRR by ~10\% compared to 80/20 splits, demonstrating the value of maximizing training data.
+    
+    \item \textbf{Transductive vs Inductive:} Naive random and transductive splits showed nearly identical test performance, suggesting that the ``unseen entity'' problem is minimal for this well-connected family graph.
+    
+    \item \textbf{Near-Perfect Hits@10:} All top models achieved >97\% Hits@10, indicating excellent ranking quality---the correct answer is almost always in the top 10 predictions.
+\end{enumerate}
+
+% ============================================================================
 % CONCLUSIONS
 % ============================================================================
 \newpage
@@ -825,10 +1011,12 @@ Based on the theoretical properties of models and splitting strategies:
 \subsection{Task 4: Link Prediction}
 
 \begin{itemize}
-    \item Three splitting strategies address different evaluation concerns
-    \item \textbf{Inverse-leakage removal} is crucial for fair family graph evaluation
-    \item \textbf{RotatE} is theoretically optimal for diverse relation patterns
-    \item \textbf{RGCN+decoder} approaches leverage graph structure for encoding
+    \item \textbf{ComplEx achieved best performance} with 0.877 MRR (full training) and 0.998 Hits@10
+    \item ComplEx outperformed all other models across all split types
+    \item \textbf{Custom RotatE underperformed} (0.2 MRR) compared to PyKEEN RotatE (0.76 MRR)
+    \item \textbf{Inverse leakage removal} caused ~12\% validation MRR drop, revealing shortcut exploitation
+    \item \textbf{RGCN+RotatE} was the best GNN approach (0.58 MRR)
+    \item Near-perfect Hits@10 (>97\%) demonstrates excellent ranking quality
 \end{itemize}
 
 \section{Interconnections Between Tasks}

@@ -277,9 +277,12 @@ pip install pykeen  # Optional: for library model comparison
 - Complex cousin rules have **0% confidence** (relation types missing from data)
 
 ### Task 4: Link Prediction
-- **Inverse leakage removal** is critical for fair family graph evaluation
-- Performance drops significantly when inverse shortcuts are removed
-- **RotatE** is theoretically optimal for diverse relation patterns
+- **ComplEx achieved best performance** (0.877 MRR, 0.998 Hits@10 on full training)
+- ComplEx outperformed all models across all split types
+- **Inverse leakage removal** caused ~12% validation MRR drop, revealing shortcut exploitation
+- Custom RotatE underperformed (0.2 MRR) vs PyKEEN RotatE (0.76 MRR)
+- **RGCN+RotatE** was the best GNN approach (0.58 MRR)
+- Near-perfect Hits@10 (>97%) demonstrates excellent ranking quality
 - **Transductive** split shows best raw metrics but may be inflated
 
 ---
@@ -317,14 +320,14 @@ Results vary by split type. The inverse-leakage-removal split provides the most 
 
 | Model | Naive Random | Transductive | Inverse Removed | Full Train |
 |-------|-------------|--------------|-----------------|------------|
-| TransE | - | - | - | - |
-| DistMult | - | - | - | - |
-| ComplEx | - | - | - | - |
-| RotatE | - | - | - | - |
-| RGCN+DistMult | - | - | - | - |
-| RGCN+RotatE | - | - | - | - |
+| TransE | 0.715 | 0.706 | 0.698 | 0.744 |
+| DistMult | 0.646 | 0.614 | 0.639 | 0.693 |
+| **ComplEx** | **0.842** | **0.852** | **0.838** | **0.877** |
+| RotatE | 0.171 | 0.209 | 0.163 | 0.263 |
+| RGCN+DistMult | 0.435 | 0.345 | 0.431 | 0.492 |
+| RGCN+RotatE | 0.513 | 0.442 | 0.547 | 0.579 |
 
-*Run `04_Link_Pred.ipynb` to populate results.*
+**Key Finding:** ComplEx consistently achieves the best performance across all split types, with 0.877 MRR on full training and near-perfect Hits@10 (>97%).
 
 ### Visualizations
 
