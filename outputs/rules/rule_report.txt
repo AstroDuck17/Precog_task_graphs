@@ -1,0 +1,170 @@
+================================================================================
+METAFAM RULE MINING REPORT
+================================================================================
+
+
+============================================================
+RULE 1: Grandmother Logic
+============================================================
+Definition: Mother(x, y) ∧ Mother(z, x) → Grandmother(z, y)
+
+METRICS:
+  Support:    309
+  Success:    309
+  Confidence: 1.000000
+  Exceptions: 0
+  Time:       0.0401s
+
+EXAMPLE MATCHES (up to 3):
+  ('isabella815', 'claudia814', 'david832')
+  ('paula1026', 'angelina1028', 'marlene1033')
+  ('valerie963', 'hannah965', 'lisa971')
+
+EXAMPLE EXCEPTIONS (up to 3):
+
+============================================================
+RULE 2: Sibling Logic
+============================================================
+Definition: Mother(z, x) ∧ Child(y, z) ∧ (x ≠ y) → Sibling(x, y)
+
+METRICS:
+  Support:    1,206
+  Success:    1,206
+  Confidence: 1.000000
+  Exceptions: 0
+  Time:       0.0018s
+
+EXAMPLE MATCHES (up to 3):
+  ('luisa506', 'sofia502', 'lara522')
+  ('luisa506', 'sofia502', 'emilia511')
+  ('luisa506', 'lara522', 'sofia502')
+
+EXAMPLE EXCEPTIONS (up to 3):
+
+============================================================
+RULE 3: Aunt Logic
+============================================================
+Definition: Mother(x, y) ∧ Mother(z, x) ∧ Daughter(w, z) → Aunt(w, y)
+
+METRICS:
+  Support:    166
+  Success:    166
+  Confidence: 1.000000
+  Exceptions: 0
+  Time:       0.0586s
+
+EXAMPLE MATCHES (up to 3):
+  ('angelina1028', 'marlene1033', 'paula1026', 'lea1050')
+  ('hannah965', 'lisa971', 'valerie963', 'magdalena967')
+  ('sofia817', 'natalie838', 'sophie819', 'valerie831')
+
+EXAMPLE EXCEPTIONS (up to 3):
+
+============================================================
+RULE 4: Parent/Child Inverse
+============================================================
+Definition: Father(x, y) → Child(y, x)
+
+METRICS:
+  Support:    733
+  Success:    608
+  Confidence: 0.829468
+  Exceptions: 100
+  Time:       0.0009s
+
+EXAMPLE MATCHES (up to 3):
+  ('marcel1266', 'leonie1280')
+  ('marcel580', 'paul583')
+  ('moritz663', 'oskar664')
+
+EXAMPLE EXCEPTIONS (up to 3):
+  ('gabriel708', 'benjamin710')
+  ('adam719', 'maria725')
+  ('thomas1214', 'angelina1220')
+
+============================================================
+RULE 5: Sibling Symmetry
+============================================================
+Definition: Sibling(x, y) → Sibling(y, x)
+
+METRICS:
+  Support:    1,206
+  Success:    1,206
+  Confidence: 1.000000
+  Exceptions: 0
+  Time:       0.0013s
+
+EXAMPLE MATCHES (up to 3):
+  ('helena691', 'emma683', 'sisterOf')
+  ('anna559', 'noah557', 'sisterOf')
+  ('katharina617', 'karin613', 'sisterOf')
+
+EXAMPLE EXCEPTIONS (up to 3):
+
+============================================================
+RULE 6: Gender Inverse
+============================================================
+Definition: SisterOf(x, y) → BrotherOf(y, x) [if y is Male]
+
+METRICS:
+  Support:    308
+  Success:    308
+  Confidence: 1.000000
+  Exceptions: 0
+  Time:       0.0003s
+
+EXAMPLE MATCHES (up to 3):
+  ('anna559', 'noah557')
+  ('helena691', 'leo693')
+  ('anastasia1188', 'daniel1187')
+
+EXAMPLE EXCEPTIONS (up to 3):
+
+============================================================
+RULE 7: First Cousin Once Removed (Type A)
+============================================================
+Definition: Mother(a, b) ∧ Grandmother(c, a) ∧ Daughter(d, c) → FirstCousinOnceRemoved(d, b)
+
+METRICS:
+  Support:    243
+  Success:    0
+  Confidence: 0.000000
+  Exceptions: 100
+  Time:       0.0560s
+
+EXAMPLE MATCHES (up to 3):
+
+EXAMPLE EXCEPTIONS (up to 3):
+  ('claudia814', 'david832', 'sofia817', 'natalie838')
+  ('claudia814', 'david832', 'sofia817', 'nora825')
+  ('angelina1028', 'marlene1033', 'elena1041', 'paula1026')
+
+============================================================
+RULE 8: First Cousin Once Removed (Type B)
+============================================================
+Definition: Father(a, b) ∧ FirstCousin(c, a) ∧ Grandchild(d, c) → FirstCousinOnceRemoved(d, b)
+
+METRICS:
+  Support:    18
+  Success:    0
+  Confidence: 0.000000
+  Exceptions: 18
+  Time:       0.0817s
+
+EXAMPLE MATCHES (up to 3):
+
+EXAMPLE EXCEPTIONS (up to 3):
+  ('sebastian720', 'elena722', 'benjamin710', 'felix731')
+  ('jonathan84', 'lukas93', 'marlene86', 'katharina99')
+  ('felix986', 'nico997', 'angelina978', 'stefan991')
+
+
+============================================================
+NOISE ANALYSIS: Random Variable Injection
+============================================================
+Rule 1 Support: 309
+Rule 1 Confidence: 1.000000
+Rule 9 Theoretical Support: 196,524
+Rule 9 Sampled Confidence: 1.000000
+Support Explosion Factor: 636x
+Confidence Difference: 0.000000

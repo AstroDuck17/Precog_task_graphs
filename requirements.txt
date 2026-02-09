@@ -1,0 +1,15 @@
+# MetaFam Knowledge Graph Analysis
+# Task 1: Dataset Exploration
+
+# Core dependencies
+networkx>=3.0
+numpy>=1.24
+pandas>=2.0
+
+# Visualization
+matplotlib>=3.7
+seaborn>=0.12
+
+# Jupyter notebook support
+jupyter>=1.0
+ipykernel>=6.0

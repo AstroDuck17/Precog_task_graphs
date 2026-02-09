@@ -1,0 +1,9 @@
+rule_id,rule_name,definition,support,success,confidence,num_exceptions,execution_time_sec
+1,Grandmother Logic,"Mother(x, y) ∧ Mother(z, x) → Grandmother(z, y)",309,309,1.0,0,0.0400545597076416
+2,Sibling Logic,"Mother(z, x) ∧ Child(y, z) ∧ (x ≠ y) → Sibling(x, y)",1206,1206,1.0,0,0.0017914772033691406
+3,Aunt Logic,"Mother(x, y) ∧ Mother(z, x) ∧ Daughter(w, z) → Aunt(w, y)",166,166,1.0,0,0.05861830711364746
+4,Parent/Child Inverse,"Father(x, y) → Child(y, x)",733,608,0.8294679399727148,100,0.0008711814880371094
+5,Sibling Symmetry,"Sibling(x, y) → Sibling(y, x)",1206,1206,1.0,0,0.0013446807861328125
+6,Gender Inverse,"SisterOf(x, y) → BrotherOf(y, x) [if y is Male]",308,308,1.0,0,0.0003387928009033203
+7,First Cousin Once Removed (Type A),"Mother(a, b) ∧ Grandmother(c, a) ∧ Daughter(d, c) → FirstCousinOnceRemoved(d, b)",243,0,0.0,100,0.055959224700927734
+8,First Cousin Once Removed (Type B),"Father(a, b) ∧ FirstCousin(c, a) ∧ Grandchild(d, c) → FirstCousinOnceRemoved(d, b)",18,0,0.0,18,0.08170604705810547

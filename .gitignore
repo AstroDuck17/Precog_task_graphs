@@ -1,0 +1,17 @@
+*.aux
+*.log
+*.out
+*.toc
+assignment*.md
+skill.md
+detail.md
+insights.txt
+task1insight.txt
+task2insight.txt
+task3insight.txt
+task4insight.txt
+models/
+_pycache_/
+MetaFam_Complete_Report.fdb_latexmk
+*.fls
+*.gz
