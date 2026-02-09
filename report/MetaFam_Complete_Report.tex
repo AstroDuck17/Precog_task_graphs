@@ -321,7 +321,7 @@ Gender was inferred from relation semantics (e.g., \texttt{fatherOf} $\rightarro
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.65\textwidth]{generation_distribution.png}
+    \includegraphics[width=0.5\textwidth]{generation_distribution.png}
     \caption{Generation distribution across the MetaFam graph. Generation 2 (parents) dominates, while generation 3 (youngest children) is sparse---typical of an ongoing family tree.}
     \label{fig:gen_dist}
 \end{figure}
@@ -350,7 +350,7 @@ Community detection identifies densely connected subgroups within the network. F
 
 \begin{enumerate}
     \item \textbf{Girvan-Newman:} Divisive hierarchical method based on edge betweenness \cite{girvan2002community}
-    \item \textbf{Louvain:} Greedy modularity optimization (fast, scalable) \cite{blondel2008fast}
+    \item \textbf{Louvain:} Greedy modularity optimization (fast, scalable)
     \item \textbf{Leiden:} Improved Louvain with guaranteed well-connected communities \cite{traag2019louvain}
 \end{enumerate}
 
@@ -395,7 +395,7 @@ Community detection identifies densely connected subgroups within the network. F
 
 \subsection{Do Communities Match Families?}
 
-\textbf{Yes, perfectly.} Each detected community corresponds exactly to one of the 50 connected components (family trees).
+\textbf{Yes, perfectly.} Each detected community corresponds exactly to one of the 50 connected components (family trees). Number of Communities can be visualised using the gephi visualisation which shows 50 communities.
 
 \subsection{Generational Depth}
 
@@ -416,17 +416,45 @@ Community detection identifies densely connected subgroups within the network. F
 
 \textbf{Finding:} No significant bridge individuals exist (max betweenness = 0.0001).
 
-\textbf{Reason:} Without spouse relations, there are no inter-family connections that would create bridge nodes.
+\textbf{Reason:} Without spouse relations, there are no inter-family connections that would create significant bridge nodes.
 
 \section{Closest Relative Metric}
 
-We proposed a \textbf{Relationship Strength Score} combining:
+Beyond simple hop counting, we implemented two sophisticated proximity measures to identify closest relatives:
+
+\subsection{Random Walk with Restarts (RWR)}
+
+RWR simulates a random walker that:
+\begin{enumerate}
+    \item At each step, with probability $(1-c)$, follows a random edge
+    \item With probability $c$ (restart probability), returns to the source node
+\end{enumerate}
+
+The stationary distribution gives proximity scores---higher scores indicate nodes more easily reachable from the source. RWR captures both path length and path diversity, making it ideal for family graphs where multiple paths through shared ancestors contribute to relationship strength.
+
+\textbf{Implementation:} Used Personalized PageRank with restart probability $c = 0.15$.
+
+\subsection{Katz Index}
+
+Katz Index counts all paths between nodes, weighted exponentially by path length:
 
 \begin{equation}
-    S(u, v) = \alpha \cdot \frac{1}{d(u,v)} + \beta \cdot |N(u) \cap N(v)| + \gamma \cdot \text{RelationType}(u,v)
+    K(s,t) = \sum_{l=1}^{\infty} \beta^l \cdot |\text{paths of length } l \text{ from } s \text{ to } t|
 \end{equation}
 
-where $d(u,v)$ is shortest path distance, $N(\cdot)$ is neighborhood, and RelationType assigns weights based on relation semantics (parent > cousin > distant relative).
+where $\beta$ is the attenuation factor (set to 0.1). Unlike Adamic-Adar which focuses only on one-hop neighbors, Katz captures global structural influence.
+
+\textbf{Key Insight:} Katz is computationally expensive but excels at detecting close family even without direct edges---siblings share many indirect paths through parents; cousins share paths through grandparents.
+
+\subsection{Proposed Relationship Strength Score}
+
+We propose a combined \textbf{Relationship Strength Score} leveraging both proximity measures:
+
+\begin{equation}
+    S(u, v) = \alpha \cdot \text{RWR}(u,v) + \beta \cdot \text{Katz}(u,v)
+\end{equation}
+
+where RWR captures local reachability structure and Katz captures path diversity across the graph. This combination is preferred over Adamic-Adar since Adamic-Adar only considers common one-hop neighbors, while RWR and Katz capture global graph structure essential for multi-generational family relationships.
 
 % ============================================================================
 % PART III: RULE MINING (TASK 3)
@@ -456,28 +484,40 @@ Rule mining discovers logical patterns (horn-clause rules) that hold in the know
 
 \subsection{Group A: Transitive Rules}
 
+These rules chain parent-child relationships transitively:
+
 \begin{enumerate}
     \item \textbf{Grandmother:} Mother(x,y) $\land$ Mother(z,x) $\rightarrow$ Grandmother(z,y)
     \item \textbf{Sibling:} Mother(z,x) $\land$ Child(y,z) $\land$ (x$\neq$y) $\rightarrow$ Sibling(x,y)
     \item \textbf{Aunt:} Mother(x,y) $\land$ Mother(z,x) $\land$ Daughter(w,z) $\rightarrow$ Aunt(w,y)
 \end{enumerate}
 
-\subsection{Group B: Inverse Rules}
+\subsection{Group B: Inverse Parent-Child and Gender Inverse Rules}
 
 \begin{enumerate}
     \setcounter{enumi}{3}
-    \item \textbf{Parent/Child:} Father(x,y) $\rightarrow$ Child(y,x)
-    \item \textbf{Sibling Symmetry:} Sibling(x,y) $\rightarrow$ Sibling(y,x)
+    \item \textbf{Parent/Child Inverse:} Father(x,y) $\rightarrow$ Child(y,x)
     \item \textbf{Gender Inverse:} Sister(x,y) $\land$ isMale(y) $\rightarrow$ Brother(y,x)
 \end{enumerate}
 
-\subsection{Group C: Complex Rules}
+\subsection{Group C: Symmetric Sibling Relation}
+
+\begin{enumerate}
+    \setcounter{enumi}{5}
+    \item \textbf{Sibling Symmetry:} Sibling(x,y) $\rightarrow$ Sibling(y,x)
+\end{enumerate}
+
+\subsection{Group D: Complex First Cousin Once Removed Rules}
+
+These rules define the ``first cousin once removed'' relationship with two directional variants:
 
 \begin{enumerate}
     \setcounter{enumi}{6}
-    \item \textbf{First Cousin Once Removed (A)}
-    \item \textbf{First Cousin Once Removed (B)}
+    \item \textbf{First Cousin Once Removed (Type A):} The child (entity A) of one's parent's cousin (entity B)---one generation below the first cousin.
+    \item \textbf{First Cousin Once Removed (Type B):} One's parent's first cousin (entity A) is one generation above the querying person (entity B).
 \end{enumerate}
+
+\textbf{Note:} Type A represents the relationship from the perspective of the older generation looking down, while Type B represents the perspective from the younger generation looking up.
 
 \section{Results Summary}
 
@@ -505,14 +545,14 @@ Rule mining discovers logical patterns (horn-clause rules) that hold in the know
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{rule_confidence_chart.png}
-    \caption{Rule confidence comparison. Transitive rules (1-3) and inverse rules (5-6) achieve perfect confidence, while the parent/child inverse (4) shows 83\% due to incomplete bidirectional edges. Complex cousin rules (7-8) have 0\% confidence due to missing relation types.}
+    \caption{Rule confidence comparison. Transitive rules (1-3) and inverse rules (5-6) achieve perfect confidence, while the parent/child inverse (4) shows 83\% due to incomplete bidirectional edges. Complex cousin rules (7-8) have 0\% confidence due to missing relation types or wrong rules.}
     \label{fig:rule_conf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{support_vs_success.png}
-    \caption{Support vs. Success count for each rule. Rules with identical support and success achieve 100\% confidence. Rules 7 and 8 have support but zero success, indicating the conclusion relation type is absent from the dataset.}
+    \includegraphics[width=0.6\textwidth]{support_vs_success.png}
+    \caption{Support vs. Success count for each rule. Rules with identical support and success achieve 100\% confidence. Rules 7 and 8 have support but zero success, indicating the conclusion relation type is absent from the dataset or relationship implied is incorrect.}
     \label{fig:support_success}
 \end{figure}
 
@@ -550,6 +590,8 @@ Adding an irrelevant predicate (Sister(a,b)) to the Grandmother rule:
 \section{Introduction to Task 4}
 
 Link prediction aims to infer missing edges in a knowledge graph using learned embeddings \cite{wang2017knowledge}. This task evaluates multiple Knowledge Graph Embedding (KGE) and Graph Neural Network (GNN) models across different data splitting strategies.
+
+\textbf{Note:} A detailed technical report covering all implementation details, mathematical derivations, and extended analysis is available in \texttt{task4\_report.tex}.
 
 \subsection{Objectives}
 
@@ -622,73 +664,18 @@ A critical aspect of link prediction is how training/validation data is split. F
     \caption{Progression of Data Splitting Strategies}
 \end{figure}
 
-\section{Knowledge Graph Embedding Models}
+\section{Models Implemented}
 
-\subsection{TransE}
+\subsection{Knowledge Graph Embedding Models}
 
-TransE \cite{bordes2013translating} models relations as translations in the embedding space.
-
-\textbf{Scoring Function:}
-\begin{equation}
-    f(h, r, t) = -\|h + r - t\|_{L_2}
-\end{equation}
+We implemented four KGE models with different mathematical properties:
 
 \begin{itemize}
-    \item \textbf{Intuition:} Head + Relation $\approx$ Tail in embedding space
-    \item \textbf{Strength:} Simple, efficient, handles composition
-    \item \textbf{Weakness:} Cannot model \textbf{symmetric relations} (if $h + r = t$, then $t + r \neq h$)
+    \item \textbf{TransE:} Models relations as translations ($h + r \approx t$). Handles composition and inverse but not symmetric relations.
+    \item \textbf{DistMult:} Bilinear diagonal model ($\langle h, r, t \rangle$). Handles symmetric relations but not anti-symmetric or inverse.
+    \item \textbf{ComplEx:} Complex-valued DistMult with conjugation. Handles anti-symmetric and inverse relations via the conjugate mechanism.
+    \item \textbf{RotatE:} Models relations as rotations in complex space ($h \circ r = t$). Theoretically handles all relation patterns including composition.
 \end{itemize}
-
-\subsection{DistMult}
-
-DistMult \cite{yang2014embedding} uses a bilinear diagonal model for scoring.
-
-\textbf{Scoring Function:}
-\begin{equation}
-    f(h, r, t) = \langle h, r, t \rangle = \sum_i h_i \cdot r_i \cdot t_i
-\end{equation}
-
-\begin{itemize}
-    \item \textbf{Intuition:} Trilinear dot product (cosine similarity variant)
-    \item \textbf{Strength:} Handles symmetric relations naturally
-    \item \textbf{Weakness:} Cannot model \textbf{anti-symmetric}, \textbf{composition}, or \textbf{inverse} relations
-\end{itemize}
-
-\subsection{ComplEx}
-
-ComplEx \cite{trouillon2016complex} extends DistMult to complex-valued embeddings.
-
-\textbf{Scoring Function:}
-\begin{equation}
-    f(h, r, t) = \text{Re}(\langle h, r, \bar{t} \rangle)
-\end{equation}
-
-where $\bar{t}$ is the complex conjugate of $t$.
-
-\begin{itemize}
-    \item \textbf{Intuition:} Complex-valued embeddings with conjugation
-    \item \textbf{Strength:} Handles \textbf{anti-symmetric} relations via conjugation
-    \item \textbf{Weakness:} Cannot model \textbf{composition} and \textbf{1-to-N} relations
-\end{itemize}
-
-\subsection{RotatE}
-
-RotatE \cite{sun2019rotate} models relations as rotations in complex space.
-
-\textbf{Scoring Function:}
-\begin{equation}
-    f(h, r, t) = -\|h \circ r - t\|
-\end{equation}
-
-where $\circ$ is element-wise rotation in complex plane, $r_i = e^{i\theta_i}$.
-
-\begin{itemize}
-    \item \textbf{Intuition:} Relations as \textbf{rotations} in complex space
-    \item \textbf{Strength:} Handles \textbf{symmetric}, \textbf{anti-symmetric}, \textbf{inverse}, and \textbf{composition}
-    \item \textbf{Theoretical Best:} Most expressive model due to rotation properties
-\end{itemize}
-
-\subsection{Model Comparison}
 
 \begin{table}[H]
     \centering
@@ -701,92 +688,25 @@ where $\circ$ is element-wise rotation in complex plane, $r_i = e^{i\theta_i}$.
         Anti-symmetric & \ding{51} & \ding{55} & \ding{51} & \ding{51} \\
         Inverse & \ding{51} & \ding{55} & \ding{51} & \ding{51} \\
         Composition & \ding{51} & \ding{55} & \ding{55} & \ding{51} \\
-        1-to-N & \ding{55} & \ding{51} & \ding{55} & \ding{51} \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-\section{Graph Neural Network Approaches}
+\subsection{GNN Approaches}
 
-\subsection{RGCN (Relational Graph Convolutional Network)}
-
-RGCN \cite{schlichtkrull2018modeling} extends GCN \cite{kipf2016semi} to handle multiple relation types:
-
-\begin{equation}
-    h_i^{(l+1)} = \sigma \left( \sum_{r \in R} \sum_{j \in N_i^r} \frac{1}{c_{i,r}} W_r^{(l)} h_j^{(l)} + W_0^{(l)} h_i^{(l)} \right)
-\end{equation}
-
-\textbf{Role:} Encoder that produces node embeddings by aggregating neighborhood information across different relation types.
-
-\subsection{RGCN + Decoder Combinations}
-
-\begin{enumerate}
-    \item \textbf{RGCN + DistMult:} RGCN encodes nodes, DistMult scores triples
-    \item \textbf{RGCN + RotatE:} RGCN with complex-valued features, RotatE decoder
-\end{enumerate}
-
-The GNN approach leverages \textbf{graph structure} during encoding, potentially capturing higher-order patterns.
-
-\section{Evaluation Metrics}
-
-\subsection{Mean Reciprocal Rank (MRR)}
-
-\begin{equation}
-    MRR = \frac{1}{|Q|} \sum_{i=1}^{|Q|} \frac{1}{\text{rank}_i}
-\end{equation}
-
-\textbf{Interpretation:} Average of reciprocal ranks of correct answers. MRR = 1.0 means all correct answers ranked first.
-
-\subsection{Hits@K}
-
-\begin{equation}
-    \text{Hits@}K = \frac{|\{q : \text{rank}(q) \leq K\}|}{|Q|}
-\end{equation}
-
+We implemented RGCN (Relational Graph Convolutional Network) as an encoder with two decoder combinations:
 \begin{itemize}
-    \item \textbf{Hits@1:} Fraction of queries with correct answer in top 1
-    \item \textbf{Hits@10:} Fraction with correct answer in top 10
+    \item \textbf{RGCN + DistMult:} RGCN encodes nodes via message passing, DistMult scores triples
+    \item \textbf{RGCN + RotatE:} RGCN produces complex-valued embeddings, RotatE decoder scores triples
 \end{itemize}
 
-\section{Expected Outcomes}
+\subsection{Evaluation Metrics}
 
-Based on the theoretical properties of models and splitting strategies:
-
-\subsection{Split Type Analysis}
-
-\begin{table}[H]
-    \centering
-    \caption{Expected Performance by Split Type}
-    \begin{tabular}{lccc}
-        \toprule
-        \textbf{Aspect} & \textbf{Type 1} & \textbf{Type 2} & \textbf{Type 3} \\
-        \midrule
-        Validation MRR & Low & High & Medium \\
-        Unseen Node Issue & Yes & No & No \\
-        Inverse Leakage & Yes & Yes & No \\
-        True Generalization & Unknown & Inflated & Fair \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-\subsection{Model Expectations}
-
-\begin{enumerate}
-    \item \textbf{RotatE} should theoretically perform best due to its ability to model all relation patterns
-    \item \textbf{TransE} may struggle with symmetric family relations (sibling)
-    \item \textbf{DistMult} may struggle with inverse relations (parent $\leftrightarrow$ child)
-    \item \textbf{RGCN approaches} should benefit from neighborhood aggregation in dense family clusters
-\end{enumerate}
-
-\subsection{Key Insights from Analysis}
-
-\begin{enumerate}
-    \item \textbf{Inductive vs Transductive:} Inductive splitting risks unseen nodes; transductive ensures all nodes have embeddings but may allow trivial inverse leakage.
-    
-    \item \textbf{Inverse Pair Handling:} Critical for family graphs where Father(A,B) often coexists with Son(B,A). Removing these pairs during splitting provides fairer evaluation.
-    
-    \item \textbf{Model Selection:} RotatE's rotation mechanism makes it theoretically superior for handling the diverse relation patterns in family knowledge graphs.
-\end{enumerate}
+\begin{itemize}
+    \item \textbf{MRR:} Mean Reciprocal Rank of correct answers (1.0 = perfect)
+    \item \textbf{Hits@1:} Fraction with correct answer ranked first
+    \item \textbf{Hits@10:} Fraction with correct answer in top 10
+\end{itemize}
 
 % ============================================================================
 % EXPERIMENTAL RESULTS
@@ -921,8 +841,8 @@ To validate our custom implementations, we compared against PyKEEN, a well-estab
         \bottomrule
     \end{tabular}
     \small
-    \textit{Note: Values averaged across all split types. PyKEEN ComplEx shows near-zero performance due to potential hyperparameter mismatch.}
 \end{table}
+\textit{Note: Values averaged across all split types. PyKEEN ComplEx shows near-zero performance due to potential hyperparameter mismatch.}
 
 \begin{figure}[H]
     \centering
@@ -960,9 +880,25 @@ Comparing Transductive vs Inverse-Leakage-Removal splits reveals the impact of i
 \subsection{Key Experimental Findings}
 
 \begin{enumerate}
-    \item \textbf{ComplEx Dominates:} Contrary to theoretical expectations that RotatE should excel, ComplEx achieved the best performance across all split types and metrics. This suggests that the family graph's relation patterns (symmetric siblings, asymmetric parent-child) are better captured by ComplEx's conjugate mechanism.
+    \item \textbf{ComplEx Dominates:} Contrary to theoretical expectations that RotatE should excel, ComplEx achieved the best performance across all split types and metrics. This is explained by the \textbf{``Over-Regularization'' Hypothesis}:
     
-    \item \textbf{RotatE Underperforms:} Our custom RotatE implementation significantly underperformed, achieving only ~0.2 MRR compared to ComplEx's ~0.85. The PyKEEN RotatE implementation performed much better (~0.76 MRR), indicating potential issues with our custom rotation mechanism or training dynamics.
+    \begin{itemize}
+        \item MetaFam is a \textbf{noise-free, synthetic dataset}---logical rules (e.g., sister is always female) are 100\% consistent
+        \item Libraries like PyKEEN are tuned for \textbf{noisy, real-world data} (Freebase, Wikidata) and apply heavy regularization (L2, N3, Dropout)
+        \item On clean data, \textbf{overfitting is actually beneficial}---our custom ComplEx essentially ``memorizes'' the perfect logic of the family tree without regularization holding it back
+        \item PyKEEN ComplEx ``plays it safe'' and underperforms on this specific clean dataset
+    \end{itemize}
+    
+    \item \textbf{RotatE Custom vs PyKEEN:} Our custom RotatE achieved only 0.2 MRR while PyKEEN RotatE achieved 0.76 MRR. This is explained by the \textbf{``Modulus Drift'' Problem}:
+    
+    \begin{itemize}
+        \item In family trees, relations are \textbf{compositional}---\texttt{greatGrandsonOf} is essentially $r_{son} \circ r_{son} \circ r_{son}$
+        \item RotatE requires the constraint $|r| = 1$ (unit magnitude), but our custom implementation lacks this constraint
+        \item Without this constraint, if $|r_{son}| = 1.1$, then for a great-grandson (3 hops), magnitude becomes $1.1^3 \approx 1.33$
+        \item If $|r_{son}| = 0.9$, magnitude becomes $0.9^3 \approx 0.72$
+        \item This \textbf{``modulus drift''} causes embedding vectors to either vanish (shrink to 0) or explode, destroying the geometric structure needed for precise reasoning on deep queries
+        \item PyKEEN's RotatE properly enforces $|r| = 1$, explaining its superior performance
+    \end{itemize}
     
     \item \textbf{GNN Models:} RGCN-based models showed moderate performance (0.4-0.6 MRR), with RGCN\_RotatE consistently outperforming RGCN\_DistMult. The message passing mechanism provides useful structural information but doesn't match pure embedding approaches for this dataset.
     

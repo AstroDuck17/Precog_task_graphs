@@ -15,3 +15,6 @@ _pycache_/
 MetaFam_Complete_Report.fdb_latexmk
 *.fls
 *.gz
+task1_report.fdb_latexmk
+task2_report.fdb_latexmk
+task3_report.fdb_latexmk

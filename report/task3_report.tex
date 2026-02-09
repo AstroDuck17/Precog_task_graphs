@@ -396,13 +396,11 @@ Both achieved 100\% confidence, indicating:
 
 \textbf{Why Zero Confidence?}
 
-From \texttt{task3insight.txt}: \textit{``The complex relations have 0 confidence, logically the rules look correct but there is no such instance present in the dataset.''}
-
 \textbf{Analysis:}
 \begin{enumerate}
     \item The premise chains DO exist (Support $>$ 0)
     \item The conclusion edges (\texttt{FirstCousinOnceRemovedOf}) do NOT exist
-    \item This indicates \textbf{missing relationship types} in the dataset, not rule errors
+    \item This indicates possible rule error.
 \end{enumerate}
 
 \textbf{Semantic Mismatch Investigation:}
@@ -418,7 +416,7 @@ Tracing the path:
 
 If $b$ is $a$'s child, then $d$ is \textbf{GREAT-AUNT} of $b$.
 
-\textbf{Conclusion:} The rule definition may have a semantic error, OR the dataset uses non-standard family relationship terminology.
+\textbf{Conclusion:} The rule definition is incorrect.
 
 % ----------------------------------------------------------------------------
 % SECTION 5: NOISE ANALYSIS
@@ -519,9 +517,7 @@ Adding an irrelevant predicate should:
     \item \textbf{High-Quality Compositional Rules}: Transitive rules (grandmother, sibling, aunt) achieve 100\% confidence, indicating a well-structured family knowledge graph.
     
     \item \textbf{Incomplete Inverse Edges}: The Parent/Child inverse rule (83\%) reveals that inverse relations are not always stored bidirectionally.
-    
-    \item \textbf{Missing Extended Relations}: Complex cousin relationships have 0\% confidence because the \texttt{FirstCousinOnceRemovedOf} relation may not exist in the dataset.
-    
+        
     \item \textbf{Symmetric Relations Work}: Sibling symmetry and gender-specific inverses are fully satisfied.
 \end{enumerate}
 
@@ -537,7 +533,6 @@ Adding an irrelevant predicate should:
         Transitive/Compositional & 1.0000 & Excellent \\
         Inverse (Symmetric) & 1.0000 & Excellent \\
         Inverse (Parent-Child) & 0.8295 & Incomplete data \\
-        Complex/Extended & 0.0000 & Missing relations \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -550,7 +545,6 @@ From our rule mining analysis:
     \item \textbf{Graph Completeness}: 
     \begin{itemize}
         \item Basic family relations (parent, sibling, grandparent, aunt) are well-populated
-        \item Extended relations (first cousin once removed) may be absent
     \end{itemize}
     
     \item \textbf{Bidirectionality}:
@@ -603,7 +597,7 @@ From our rule mining analysis:
     \item \texttt{FirstCousinOnceRemoved(natalie838, david832)} does NOT exist \ding{55}
 \end{itemize}
 
-\textbf{Reason}: The \texttt{FirstCousinOnceRemovedOf} relation type may not be present in the dataset's vocabulary.
+\textbf{Reason}: The \texttt{FirstCousinOnceRemovedOf} relation type for natalie838  and david 832 is incorrect and hence not present in the dataset.
 
 % ----------------------------------------------------------------------------
 % SECTION 8: SUMMARY
@@ -633,7 +627,7 @@ From our rule mining analysis:
 \begin{itemize}
     \item \textbf{5 rules with 100\% confidence} (can be used for inference)
     \item \textbf{1 rule with 83\% confidence} (indicates incomplete data)
-    \item \textbf{2 rules with 0\% confidence} (missing relation types or semantic mismatch)
+    \item \textbf{2 rules with 0\% confidence} (missing relation types, semantic mismatch or incorrect rules)
     \item \textbf{Noise analysis}: Irrelevant predicates don't affect confidence but explode search space by 636$\times$
 \end{itemize}
 
