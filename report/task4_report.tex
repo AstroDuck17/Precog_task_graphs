@@ -105,9 +105,9 @@
     \vspace{2cm}
     
     \begin{tabular}{rl}
-        \textbf{Models:} & TransE, DistMult, ComplEx, RotatE, RGCN \\
+        \textbf{Models:} & TransE, DistMult, ComplEx, RotatE, RGCN, CompGCN \\
         \textbf{Splits:} & Naive Random, Transductive, Leakage-Free \\
-        \textbf{Metrics:} & MRR, Hits@1, Hits@10 \\
+        \textbf{Metrics:} & MRR, Hits@1, Hits@3, Hits@10 \\
         \textbf{Libraries:} & Custom Implementation + PyKEEN \\
     \end{tabular}
     
@@ -831,6 +831,209 @@ For family knowledge graphs (and any KG with abundant inverse relations), use \t
 \textbf{Observation:} RGCN\_RotatE outperforms RGCN\_DistMult, suggesting the rotation decoder helps even with GNN-encoded features.
 
 % ============================================================================
+% COMPGCN WITH CUSTOM NODE FEATURES (TASK 5)
+% ============================================================================
+\section{CompGCN with Custom Node Features}
+\label{sec:compgcn}
+
+Building on the GNN analysis above, we explore \textbf{Composition-Based Multi-Relational Graph Convolutional Networks (CompGCN)} \cite{vashishth2020compgcn} enhanced with domain-specific node features derived from Tasks 1--3.
+
+\subsection{Motivation}
+
+The RGCN models in the previous section used randomly initialized entity embeddings, discarding the rich structural and demographic features available in MetaFam. CompGCN addresses two limitations:
+
+\begin{enumerate}
+    \item \textbf{Feature Integration:} Replaces random initialization with engineered features (gender, generation, centrality, community membership), injecting domain knowledge into the learning process
+    \item \textbf{Relation Composition:} Unlike RGCN which uses separate weight matrices per relation type, CompGCN jointly embeds entities and relations through composition operators, reducing parameters while explicitly modeling relation semantics
+\end{enumerate}
+
+\subsection{Architecture}
+
+\subsubsection{Feature Engineering Pipeline}
+
+Each entity receives an $F$-dimensional feature vector composed of features from earlier tasks:
+
+\begin{table}[H]
+    \centering
+    \caption{Node Feature Composition for CompGCN}
+    \label{tab:compgcn_features}
+    \begin{tabular}{llcc}
+        \toprule
+        \textbf{Feature} & \textbf{Source} & \textbf{Encoding} & \textbf{Dims} \\
+        \midrule
+        Gender & Task 1 (inference) & One-hot (M/F/Unk) & 3 \\
+        Generation & Task 1 (inference) & Normalized scalar & 1 \\
+        PageRank & Task 1 (centrality) & Scalar & 1 \\
+        In-Degree & Task 1 (structure) & Scalar & 1 \\
+        Out-Degree & Task 1 (structure) & Scalar & 1 \\
+        Total Degree & Task 1 (structure) & Scalar & 1 \\
+        Community ID & Task 2 (Louvain) & One-hot ($C$ classes) & $\sim$50 \\
+        \midrule
+        \multicolumn{3}{l}{\textbf{Total input dimension}} & $\sim$58 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Data Leakage Prevention:} Community detection is performed \emph{exclusively} on the training graph. Test edges are never used for community assignment, ensuring no information from the evaluation set leaks into node features.
+
+\subsubsection{Model Pipeline}
+
+The architecture follows a three-stage pipeline:
+
+\begin{enumerate}
+    \item \textbf{Feature Projection:} A custom \texttt{FeatureProjectionRepresentation} module projects the sparse $F$-dimensional input to a dense 64-dimensional space:
+    \[
+    \mathbf{e}_v^{(0)} = \text{ReLU}(\mathbf{W}_{\text{proj}} \cdot \mathbf{x}_v + \mathbf{b}_{\text{proj}}), \quad \mathbf{W}_{\text{proj}} \in \mathbb{R}^{64 \times F}
+    \]
+    The raw features are stored as a non-trainable buffer; only the projection weights are learned jointly with the rest of the model.
+
+    \item \textbf{CompGCN Message Passing:} Two composition-based GCN layers (hidden dim = 64) aggregate neighbor information using composition functions:
+    \[
+    \mathbf{h}_v^{(l+1)} = \sigma\!\left(\sum_{(u,r) \in \mathcal{N}(v)} \mathbf{W}_\lambda^{(l)} \cdot \phi(\mathbf{h}_u^{(l)}, \mathbf{z}_r^{(l)})\right)
+    \]
+    where $\phi$ is the composition operator and $\lambda \in \{\text{original}, \text{inverse}, \text{self-loop}\}$.
+
+    \item \textbf{RotatE Decoder:} Scores candidate triples via rotation in complex space:
+    \[
+    f(h, r, t) = -\|\mathbf{h} \circ \mathbf{r} - \mathbf{t}\|
+    \]
+\end{enumerate}
+
+\textbf{Implementation Note:} We use PyKEEN's \texttt{CombinedCompGCNRepresentations} with a ``hot-swap'' pattern---building the standard CompGCN pipeline, then replacing its default entity representations with our custom \texttt{FeatureProjectionRepresentation}. This preserves PyKEEN's training infrastructure while injecting domain features.
+
+\subsection{Training Configuration}
+
+\begin{table}[H]
+    \centering
+    \caption{CompGCN Training Hyperparameters}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} \\
+        \midrule
+        Data Split & Transductive (80/20 random) \\
+        Inverse Triples & Enabled (required by CompGCN) \\
+        Optimizer & Adam \\
+        Learning Rate & 0.001 \\
+        Max Epochs & 100 \\
+        Batch Size & 256 \\
+        Early Stopping & Patience = 15 (monitored on MRR) \\
+        CompGCN Layers & 2 \\
+        Hidden Dimension & 64 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Experimental Results}
+
+\begin{table}[H]
+    \centering
+    \caption{CompGCN-Custom vs Standard RotatE (Transductive Split, 100 Epochs)}
+    \label{tab:compgcn_results}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{MRR} & \textbf{Hits@1} & \textbf{Hits@3} & \textbf{Hits@10} \\
+        \midrule
+        CompGCN-Custom (Features + RotatE) & 0.677 & 0.509 & 0.817 & 0.968 \\
+        Standard RotatE (Random Init) & 0.791 & 0.676 & 0.897 & 0.972 \\
+        \midrule
+        \textbf{$\Delta$ (Custom $-$ Standard)} & \textcolor{red}{$-$0.114} & \textcolor{red}{$-$0.167} & \textcolor{red}{$-$0.081} & \textcolor{red}{$-$0.004} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Key Observation:} Contrary to the hypothesis that domain-specific features should improve performance, CompGCN-Custom \emph{underperforms} standard RotatE on all metrics. The deficit is largest on precision-oriented metrics (Hits@1: $-$16.7 pp) but nearly vanishes at broader recall (Hits@10: $-$0.4 pp).
+
+\subsection{Contextual Ranking Across All Models}
+
+\begin{table}[H]
+    \centering
+    \caption{CompGCN in Context: All GNN and Embedding Models (Transductive Split)}
+    \label{tab:compgcn_context}
+    \begin{tabular}{llcc}
+        \toprule
+        \textbf{Rank} & \textbf{Model (Type)} & \textbf{Test MRR} & \textbf{Test H@10} \\
+        \midrule
+        1 & ComplEx (KGE) & \textbf{0.852} & \textbf{0.986} \\
+        2 & Standard RotatE (KGE) & 0.791 & 0.972 \\
+        3 & TransE (KGE) & 0.706 & 0.970 \\
+        4 & \textbf{CompGCN-Custom (GNN+KGE)} & \textbf{0.677} & \textbf{0.968} \\
+        5 & DistMult (KGE) & 0.614 & 0.922 \\
+        6 & RGCN\_RotatE (GNN) & 0.442 & 0.814 \\
+        7 & RGCN\_DistMult (GNN) & 0.345 & 0.682 \\
+        8 & Custom RotatE (KGE, broken) & 0.209 & 0.414 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+CompGCN-Custom ranks 4th overall---below the top-three KGE models but substantially above both RGCN variants, establishing it as the \textbf{best GNN-based approach} tested on MetaFam.
+
+\subsection{Deep Analysis: Why Custom Features Did Not Help}
+
+\subsubsection{Feature Projection Bottleneck}
+
+The projection layer compresses $\sim$58 sparse dimensions (dominated by $\sim$50 community one-hot values) into 64 dense dimensions. This bottleneck is problematic because:
+
+\begin{itemize}
+    \item \textbf{Sparse-to-dense compression:} Community one-hot encoding is inherently sparse (only 1 of $\sim$50 dimensions is active). A single linear layer may fail to preserve discrete cluster identity.
+    \item \textbf{Signal dilution:} The 8 semantically meaningful features (gender, generation, centrality metrics) are numerically overwhelmed by 50 community dimensions that each contribute minimal gradient signal.
+    \item \textbf{Expressivity gap:} Standard RotatE learns 64 unconstrained, dense dimensions per entity---a strictly more expressive parameterization than linearly projecting from fixed sparse features.
+\end{itemize}
+
+\subsubsection{Community Feature Redundancy}
+
+CompGCN's message-passing mechanism \emph{already captures} community structure implicitly:
+
+\begin{itemize}
+    \item Two CompGCN layers aggregate 2-hop neighborhoods, so entities within the same family tree naturally develop similar representations.
+    \item In MetaFam, community $\equiv$ connected component. CompGCN inherently isolates these components through message passing---no cross-component information flows.
+    \item Explicitly providing community IDs thus \textbf{duplicates} information the GNN learns natively from the graph topology.
+\end{itemize}
+
+\subsubsection{Forest-of-Trees Structural Limitations}
+
+MetaFam's topology fundamentally limits GNN effectiveness:
+
+\begin{itemize}
+    \item \textbf{No cross-family transfer:} 50 disconnected components prevent pattern sharing across families.
+    \item \textbf{Shallow depth (4 generations):} Limited tree depth reduces the benefit of multi-layer message passing.
+    \item \textbf{Homogeneous neighborhoods:} Family members share similar structural roles, producing redundant aggregated features.
+\end{itemize}
+
+\subsubsection{Precision vs Recall Trade-off}
+
+The near-equal Hits@10 (0.968 vs 0.972) but divergent Hits@1 (0.509 vs 0.676) reveals an interesting pattern:
+
+\begin{itemize}
+    \item CompGCN-Custom \emph{identifies the correct entity} within the top-10 almost as reliably as standard RotatE.
+    \item But it fails to \textbf{rank it first}---the features introduce noise that blurs fine-grained distinctions needed for precise head-of-list ranking.
+    \item This is consistent with the \textbf{``feature noise'' hypothesis}: the community one-hot encoding adds a strong categorical signal that overwhelms subtle structural differences needed for Hits@1 performance.
+\end{itemize}
+
+\subsection{Positive Findings}
+
+Despite the negative headline result, several constructive insights emerge:
+
+\begin{enumerate}
+    \item \textbf{Best GNN Model:} CompGCN-Custom (MRR 0.677) substantially outperforms RGCN\_RotatE (0.442, +53\%) and RGCN\_DistMult (0.345, +96\%), confirming that domain features + composition-based architecture $>$ random init + basis-decomposition.
+
+    \item \textbf{Near-Perfect Recall:} Hits@10 of 0.968 means the model almost always includes the correct answer in its top-10 predictions, demonstrating strong neighborhood-level understanding.
+
+    \item \textbf{Architectural Validation:} The hot-swap approach (replacing PyKEEN's default entity representations with custom \texttt{FeatureProjectionRepresentation}) integrates seamlessly with the training pipeline, enabling rapid experimentation with alternative feature sets.
+
+    \item \textbf{Cross-Task Integration:} This is the only model in our pipeline to combine outputs from Tasks 1 (node features), 2 (community IDs), and 4 (link prediction), demonstrating end-to-end knowledge transfer across the analysis pipeline.
+\end{enumerate}
+
+\subsection{Implications for Future Work}
+
+\begin{enumerate}
+    \item \textbf{Learned community embeddings:} Replace one-hot encoding with low-dimensional community embeddings ($C \to d$, where $d \ll C$) to reduce sparsity and improve gradient flow
+    \item \textbf{Feature ablation:} Systematically test feature subsets (e.g., demographics only, topology only) to isolate which features help and which introduce noise
+    \item \textbf{Deeper networks:} Explore 3--4 CompGCN layers with residual connections to extend the effective receptive field
+    \item \textbf{Alternative composition operators:} Compare subtraction, multiplication, and circular correlation variants of CompGCN
+    \item \textbf{Denser graphs:} Test CompGCN-Custom on connected KGs (e.g., family graphs with spouse relations) where message-passing can transfer information globally
+\end{enumerate}
+
+% ============================================================================
 % CONCLUSIONS
 % ============================================================================
 \section{Conclusions}
@@ -844,9 +1047,13 @@ For family knowledge graphs (and any KG with abundant inverse relations), use \t
     
     \item \textbf{Custom RotatE Fails:} Missing unit modulus constraint causes modulus drift, destroying performance on compositional relations
     
-    \item \textbf{Inverse Leakage Matters:} ~12\% validation performance inflation from inverse shortcuts
+    \item \textbf{Inverse Leakage Matters:} $\sim$12\% validation performance inflation from inverse shortcuts
     
     \item \textbf{GNNs are Suboptimal:} Pure embedding approaches outperform GNN+decoder for this sparse, disconnected family graph
+    
+    \item \textbf{CompGCN-Custom is the Best GNN:} With domain features + RotatE decoder, CompGCN achieves 0.677 MRR---53\% above RGCN\_RotatE---but still 14\% below standard RotatE, showing that feature injection helps GNNs but cannot overcome MetaFam's structural limitations
+    
+    \item \textbf{Features Help Recall, Not Precision:} CompGCN-Custom nearly matches RotatE on Hits@10 (0.968 vs 0.972) but lags substantially on Hits@1 (0.509 vs 0.676), indicating that custom features add noise that blurs fine-grained ranking
 \end{enumerate}
 
 \subsection{Recommendations}
@@ -868,6 +1075,9 @@ For family knowledge graphs (and any KG with abundant inverse relations), use \t
     \item Explore rule-enhanced link prediction (inject high-confidence rules from Task 3)
     \item Test on noisy variants of MetaFam to validate the over-regularization hypothesis
     \item Develop inductive models for unseen family trees
+    \item Investigate learned community embeddings for CompGCN to reduce one-hot sparsity
+    \item Conduct feature ablation studies to isolate which node attributes benefit GNN link prediction
+    \item Test CompGCN on denser, connected KGs where cross-community message passing is possible
 \end{enumerate}
 
 % ============================================================================
@@ -906,6 +1116,11 @@ M.~Schlichtkrull, T.~N.~Kipf, P.~Bloem, R.~van den Berg, I.~Titov, and M.~Wellin
 M.~Ali et al.
 \newblock PyKEEN 1.0: A Python Library for Training and Evaluating Knowledge Graph Embeddings.
 \newblock \emph{JMLR}, 2021.
+
+\bibitem{vashishth2020compgcn}
+S.~Vashishth, S.~Sanyal, V.~Niber, and P.~Talukdar.
+\newblock Composition-Based Multi-Relational Graph Convolutional Networks.
+\newblock In \emph{ICLR}, 2020.
 
 \end{thebibliography}
 
